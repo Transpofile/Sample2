@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VDM TRANSPO</title>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* --- DESIGN VARIABLES (Updated) --- */
+        :root {
+            --primary: #1e3a8a; /* Dark Blue */
+            --secondary: #3b82f6; /* Bright Blue */
+            --accent: #2563eb;   /* Main Accent Blue */
+            --bg: #f8faff;       /* Light Blue/Gray Background */
+            --danger: #ef4444;   /* Red */
+            --warning: #f59e0b;  /* Amber */
+            --success: #10b981;  /* Emerald Green */
+            --info: #06b6d4;     /* Cyan */
+            --dark: #1f2937;     /* Darker Text */
+            --light: #ffffff;
+            --border: #e5e7eb;
+            --sidebar-w: 260px; /* Slightly wider for better spacing */
+            --header-h: 70px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { display: flex; height: 100vh; background-color: var(--bg); overflow: hidden; color: var(--dark); font-size: 14px; }
+
+        /* LOADER */
+        #loader {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95); z-index: 9999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.5s;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid var(--border);
+            border-top: 5px solid var(--accent); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- ENHANCED SIDEBAR STYLES --- */
+        .sidebar { 
+            width: var(--sidebar-w); 
+            /* Modern Gradient Background */
+            background: linear-gradient(160deg, #172554 0%, #0f172a 100%);
+            color: #e0e7ff; 
+            display: flex; flex-direction: column; 
+            transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); 
+            flex-shrink: 0; position: fixed; height: 100%; z-index: 1000;
+            box-shadow: 4px 0 20px rgba(0,0,0,0.15); /* Depth shadow */
+        }
+        
+        /* Sidebar is hidden (collapsed) */
+        .sidebar.collapsed { 
+            transform: translateX(calc(var(--sidebar-w) * -1)); 
+        }
+
+        .brand { 
+            padding: 25px; 
+            font-size: 1.5rem; 
+            font-weight: 800; 
+            letter-spacing: 0.5px;
+            background: transparent;
+            display: flex; align-items: center; gap: 12px; 
+            min-height: var(--header-h);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        /* Brand Icon Glow */
+        .brand i {
+            color: var(--secondary);
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+        }
+
+        .menu-item { 
+            margin: 6px 15px; /* Spacing for floating effect */
+            padding: 12px 20px; 
+            cursor: pointer; 
+            border-radius: 12px; /* Rounded pill shape */
+            transition: all 0.3s ease; 
+            font-weight: 500;
+            color: rgba(255,255,255,0.75);
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            border-left: none; /* Removed old border style */
+        }
+
+        /* Hover Effect: Slide and Lighten */
+        .menu-item:hover { 
+            background: rgba(255,255,255,0.08); 
+            color: #fff;
+            transform: translateX(5px); /* Slide right movement */
+        }
+
+        /* Active State: Gradient Pill with Glow */
+        .menu-item.active { 
+            background: linear-gradient(135deg, var(--accent), var(--secondary)); 
+            color: #fff; 
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+            transform: translateX(0); /* Reset slide for active */
+        }
+
+        /* Icon Animation */
+        .menu-item i { 
+            width: 24px; 
+            text-align: center; 
+            margin-right: 12px; 
+            font-size: 1.1rem; 
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); /* Bouncy transition */
+        }
+
+        .menu-item:hover i {
+            transform: scale(1.2) rotate(-5deg); /* Icon pops on hover */
+            color: var(--light);
+        }
+        
+        .menu-item.active i {
+            transform: scale(1.1);
+        }
+
+        /* --- MAIN CONTENT AREA --- */
+        .main { 
+            flex: 1; display: flex; flex-direction: column; overflow-y: auto; 
+            position: relative; transition: margin-left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        /* Desktop: Main content shifts to accommodate the sidebar */
+        .main:not(.full-width) { margin-left: var(--sidebar-w); }
+        .main.full-width { margin-left: 0; }
+        
+        /* TOPBAR */
+        .topbar { 
+            background: var(--light); padding: 10px 25px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            box-shadow: 0 1px 10px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 100;
+            min-height: var(--header-h);
+        }
+        .tb-left { display: flex; align-items: center; gap: 15px; }
+        /* Toggle button is now only a placeholder, reliance is on floating toggle */
+        .toggle-btn { border: none; background: none; font-size: 1.4rem; cursor: pointer; color: var(--primary); display: none; }
+        .tb-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+        /* DASHBOARD GRID */
+        .container { padding: 25px; max-width: 1800px; margin: 0 auto; width: 100%; }
+        .stats-grid { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 15px; margin-bottom: 25px; 
+        }
+        .stat-card { 
+            background: var(--light); padding: 20px; border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; 
+            justify-content: space-between; align-items: center; 
+            border-left: 5px solid transparent; transition: 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+        .stat-card.c-run { border-color: var(--success); }
+        .stat-card.c-break { border-color: var(--danger); }
+        .stat-card.c-repair { border-color: var(--warning); }
+        .stat-card.c-total { border-color: var(--accent); }
+        .stat-val h3 { font-size: 2.2rem; margin: 0; line-height: 1; color: var(--dark); }
+        .stat-val p { margin: 5px 0 0; color: #6b7280; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-icon { font-size: 2.5rem; opacity: 0.15; }
+
+        /* CONTENT CARD */
+        .card { 
+            background: var(--light); border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; 
+            flex-direction: column; overflow: hidden;
+        }
+        .card-header { 
+            padding: 15px 25px; border-bottom: 1px solid var(--border); 
+            display: flex; justify-content: space-between; align-items: center; 
+            flex-wrap: wrap; gap: 15px; 
+        }
+        .search-box { position: relative; }
+        .search-box input { 
+            padding: 8px 15px 8px 35px; border: 1px solid #ddd; border-radius: 25px; 
+            outline: none; width: 250px; transition: 0.3s; font-size: 14px;
+        }
+        .search-box input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 0.9rem; }
+
+        /* TABLE */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; } /* Min width for mobile scroll */
+        th { 
+            text-align: left; padding: 15px 20px; background: #f9fafb; color: #4b5563; 
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; 
+            font-weight: 700; border-bottom: 2px solid var(--border); 
+        }
+        td { 
+            padding: 14px 20px; border-bottom: 1px solid var(--border); 
+            font-size: 0.9rem; vertical-align: middle; 
+        }
+        tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: #f5f8ff; }
+        
+        /* STATUS BADGES */
+        .badge { 
+            padding: 5px 10px; border-radius: 20px; font-size: 0.7rem; 
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; 
+            display: inline-block; min-width: 80px; text-align: center;
+        }
+        .bg-running { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .bg-break { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .bg-repair { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+        .bg-standby { background: rgba(59, 130, 246, 0.15); color: var(--secondary); }
+        .bg-rescue { background: rgba(167, 139, 250, 0.15); color: #8b5cf6; }
+        .bg-busstop { background: rgba(255, 165, 0, 0.15); color: #ff9900; } /* New Bus Stop color */
+
+        /* BUTTONS */
+        .btn { 
+            padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; 
+            font-weight: 600; font-size: 0.9rem; transition: 0.2s; 
+            display: inline-flex; align-items: center; gap: 8px; color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .btn-primary { background: var(--accent); } .btn-primary:hover { background: #1d4ed8; }
+        .btn-success { background: var(--success); } .btn-success:hover { background: #059669; }
+        .btn-danger { background: var(--danger); } .btn-danger:hover { background: #dc2626; }
+        .btn-dark { background: var(--dark); } .btn-dark:hover { background: #374151; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+        .btn-icon { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; box-shadow: none; }
+
+        /* PAGINATION */
+        .pagination { display: flex; justify-content: flex-end; padding: 15px 25px; gap: 5px; align-items: center; border-top: 1px solid var(--border); }
+        .page-btn { 
+            background: #fff; border: 1px solid #ddd; color: var(--dark); 
+            width: 32px; height: 32px; display: flex; justify-content: center; 
+            align-items: center; cursor: pointer; border-radius: 6px; transition: 0.2s; 
+            font-size: 0.85rem;
+        }
+        .page-btn:hover:not(.active):not(.disabled) { background: #f0f4ff; border-color: var(--secondary); }
+        .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .page-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* MODAL */
+        .modal { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index: 2000; 
+            display: none; align-items: center; justify-content: center; opacity: 0; 
+            transition: opacity 0.3s;
+        }
+        .modal.active { opacity: 1; pointer-events: all; }
+        
+        /* MODAL WIDTH ADJUSTMENT */
+        .modal-content { 
+            background: #fff; 
+            width: 750px; /* WIDENED */
+            max-width: 95%; 
+            max-height: 95vh; 
+            overflow-y: auto; border-radius: 16px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
+            transform: translateY(-50px); transition: 0.4s cubic-bezier(0.2, 0.8, 0.4, 1.2); 
+        }
+        
+        .modal.active .modal-content { transform: translateY(0); }
+        .modal-header { 
+            padding: 20px 25px; border-bottom: 1px solid var(--border); 
+            display: flex; justify-content: space-between; align-items: center; 
+        }
+        .modal-body { padding: 25px; }
+        .modal-footer { 
+            padding: 15px 25px; border-top: 1px solid var(--border); 
+            display: flex; justify-content: flex-end; gap: 10px; background: #f9fafb; 
+            border-radius: 0 0 16px 16px;
+        }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 6px; font-weight: 600; color: var(--dark); font-size: 0.9rem; }
+        .form-control { 
+            width: 100%; padding: 10px 12px; border: 1px solid #ced4da; 
+            border-radius: 8px; outline: none; transition: 0.2s; font-size: 14px;
+        }
+        .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        .row { display: flex; gap: 15px; }
+        .col { flex: 1; }
+
+        /* Signature Canvas Styles */
+        #signature-pad {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: crosshair;
+            background: #fff;
+        }
+        .signature-controls {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 5px;
+            gap: 10px;
+        }
+        .signature-controls .btn-sm {
+            padding: 6px 10px;
+            font-size: 0.75rem;
+        }
+
+        /* DEVICE LIST IN MODAL */
+        .device-check-list { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 12px; background: #f8faff; padding: 15px; border-radius: 10px; 
+            border: 1px solid var(--border);
+        }
+        .dev-item { display: flex; flex-direction: column; }
+        .dev-item label { font-size: 0.8rem; margin-bottom: 4px; font-weight: 500; color: #4b5563; }
+        .dev-item select { font-size: 0.85rem; padding: 8px; border-radius: 6px; }
+
+        /* TOAST */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { 
+            background: #fff; padding: 15px 20px; border-radius: 8px; 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15); border-left: 5px solid var(--accent); 
+            display: flex; align-items: center; gap: 15px; min-width: 300px; 
+            transform: translateX(120%); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-success { border-color: var(--success); } .toast-success i { color: var(--success); }
+        .toast-error { border-color: var(--danger); } .toast-error i { color: var(--danger); }
+
+        /* Device Matrix Small */
+        .matrix-grid { 
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); 
+            gap: 10px; margin-top: 15px; 
+        }
+        .matrix-card { 
+            background: #fff; border: 1px solid var(--border); padding: 10px; 
+            text-align: center; border-radius: 8px; transition: 0.2s;
+        }
+        .matrix-card:hover { border-color: #fca5a5; }
+        .matrix-val { font-size: 1.3rem; font-weight: bold; margin-top: 3px; }
+        .text-red { color: var(--danger); }
+        
+        /* FLOATING TOGGLE BUTTON (UPDATED) */
+        #floating-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: var(--primary);
+            color: var(--light);
+            border: none;
+            border-radius: 50%;
+            font-size: 1.4rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1010;
+            cursor: pointer;
+            transition: 0.3s;
+            display: none; /* Controlled by JS based on sidebar state */
+            justify-content: center;
+            align-items: center;
+        }
+        #floating-toggle:hover {
+            background: var(--accent);
+            transform: scale(1.05);
+        }
+
+        /* --- MOBILE OPTIMIZATIONS --- */
+        @media (min-width: 993px) {
+            /* On desktop, the main content margin is toggled */
+            /* We rely on JS to show/hide the floating toggle */
+            .topbar .toggle-btn {
+                display: none; /* Hide the topbar toggle button on desktop */
+            }
+        }
+        
+        @media (max-width: 992px) {
+            /* On mobile, main content margin is always 0 */
+            .main:not(.full-width) { margin-left: 0; }
+            .main { margin-left: 0 !important; }
+
+            /* Topbar toggle is hidden on mobile, relying on floating toggle */
+            .topbar .toggle-btn {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            /* Ensure collapsed sidebar is off-screen on mobile/small screens */
+            .sidebar.collapsed { transform: translateX(calc(var(--sidebar-w) * -1)); }
+            .sidebar:not(.collapsed) { transform: translateX(0); } /* Visible on small screens */
+
+            /* Redundant mobile overrides for general layout */
+            .topbar { padding: 10px 15px; }
+            .tb-left h3 { font-size: 1.1rem; }
+            .tb-actions { gap: 5px; }
+            .tb-actions .btn { padding: 8px 12px; font-size: 0.8rem; }
+            .tb-actions .btn-icon { width: 32px; height: 32px; }
+
+            .container { padding: 15px; }
+            
+            .stats-grid { grid-template-columns: 1fr 1fr; } /* 2 columns on small screens */
+
+            .card-header { 
+                flex-direction: column; align-items: stretch; 
+                padding: 15px; 
+            }
+            .card-header > div { width: 100%; justify-content: space-between; }
+            .search-box input { width: 100%; }
+            .card-header .btn { flex-grow: 1; }
+
+            .row { flex-direction: column; gap: 0; }
+            .modal-content { border-radius: 0; max-width: 100%; max-height: 100vh; height: 100%; }
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <h3>Syncing Fleet Data...</h3>
+        <p style="color:#777">Connecting to Cloud Database</p>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <div class="brand">
+            <i class="fa-solid fa-satellite-dish"></i> VDM-TRANS        </div>
+        <div class="menu-item active" onclick="filterTable('All')"><i class="fa-solid fa-gauge"></i> Dashboard</div>
+        <div class="menu-item" onclick="filterTable('Running')"><i class="fa-solid fa-truck-fast"></i> Running</div>
+        <div class="menu-item" onclick="filterTable('Standby')"><i class="fa-solid fa-square-parking"></i> Standby</div>
+        <div class="menu-item" onclick="filterTable('Bus Stop')"><i class="fa-solid fa-bus"></i> Bus Stop</div> 
+        <div class="menu-item" onclick="filterTable('Break Down')"><i class="fa-solid fa-car-burst"></i> Break Down</div>
+        <div class="menu-item" onclick="filterTable('Rescue')"><i class="fa-solid fa-truck-medical"></i> Rescue</div>
+        <div class="menu-item" onclick="filterTable('For Repair')"><i class="fa-solid fa-wrench"></i> In Repair</div>
+    </div>
+
+    <div class="main full-width" id="main-content">
+        <div class="topbar">
+            <div class="tb-left">
+                <button class="toggle-btn" onclick="toggleSidebar()"><i class="fa-solid fa-chevron-left"></i></button>
+                <h3 style="margin:0;">Vehicle Devices Monitoring Record System</h3>
+            </div>
+            <div class="tb-actions">
+                <button class="btn btn-sm btn-dark" onclick="triggerImport()"><i class="fa-solid fa-file-import"></i> <span class="d-none d-md-inline">Import</span></button>
+                <button class="btn btn-sm btn-dark" onclick="exportData()"><i class="fa-solid fa-file-csv"></i> <span class="d-none d-md-inline">Export</span></button>
+                <button class="btn btn-sm btn-primary" onclick="syncData()"><i class="fa-solid fa-rotate"></i> Sync Cloud</button>
+                <input type="file" id="importFile" style="display:none" accept=".json" onchange="handleImport(this)">
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card c-run">
+                    <div class="stat-val"><h3 id="st-run">0</h3><p>Running</p></div>
+                    <i class="fa-solid fa-truck-fast stat-icon" style="color:var(--success)"></i>
+                </div>
+                <div class="stat-card c-break">
+                    <div class="stat-val"><h3 id="st-break">0</h3><p>Break Down</p></div>
+                    <i class="fa-solid fa-triangle-exclamation stat-icon" style="color:var(--danger)"></i>
+                </div>
+                <div class="stat-card c-repair">
+                    <div class="stat-val"><h3 id="st-repair">0</h3><p>Repair</p></div>
+                    <i class="fa-solid fa-wrench stat-icon" style="color:var(--warning)"></i>
+                </div>
+                <div class="stat-card c-total">
+                    <div class="stat-val"><h3 id="st-total">0</h3><p>Total Units</p></div>
+                    <i class="fa-solid fa-layer-group stat-icon" style="color:var(--accent)"></i>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                 <h4 style="color:#4b5563; margin-bottom:5px; font-weight:600;">Device Issues Matrix</h4>
+                 <div id="deviceMatrix" class="matrix-grid"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h4 id="tableTitle">All Vehicles</h4>
+                    <div style="display:flex; gap:10px; width:auto;">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="searchInput" placeholder="Search Plate # or Status..." onkeyup="handleSearch()">
+                        </div>
+                        <button class="btn btn-success" onclick="openModal()"><i class="fa-solid fa-plus"></i> Add Vehicle</button>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table id="vehicleTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 5%">Status</th>
+                                <th style="width: 15%">Plate Number</th>
+                                <th style="width: 15%">Current Status</th>
+                                <th style="width: 15%">Odometer</th>
+                                <th style="width: 25%">Device Health</th>
+                                <th style="width: 15%">Last Updated</th>
+                                <th style="width: 10%; text-align:right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="pagination" id="paginationControls">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <button id="floating-toggle" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+
+    <div class="modal" id="entryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add New Vehicle</h3>
+                <button class="btn btn-icon btn-danger" onclick="closeModal('entryModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <form id="vehicleForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editId">
+                    <div class="row">
+                        <div class="col form-group">
+                            <label class="form-label">Plate Number</label>
+                            <input type="text" class="form-control" id="plate" required placeholder="ABC-1234" style="text-transform:uppercase; font-weight:bold;">
+                        </div>
+                        <div class="col form-group">
+                            <label class="form-label">Odometer (km)</label>
+                            <input type="number" class="form-control" id="odo" required placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Operational Status</label>
+                        <select id="status" class="form-control" required>
+                            <option value="Running">Running (Operational)</option>
+                            <option value="Standby">Standby</option>
+                            <option value="Bus Stop">Bus Stop</option> 
+                            <option value="Break Down">Break Down</option>
+                            <option value="Rescue">Rescue</option>
+                            <option value="For Repair">For Repair</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Device Inspection</label>
+                        <div class="device-check-list" id="deviceInputs">
+                            </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Inspection Details</label>
+                        <div class="row">
+                            <div class="col form-group" style="margin-bottom:0;">
+                                <label class="form-label">Date Inspected:</label>
+                                <input type="date" class="form-control" id="dateInspected">
+                            </div>
+                            <div class="col form-group" style="margin-bottom:0;">
+                                <label class="form-label">Inspection By:</label>
+                                <input type="text" class="form-control" id="inspectionBy" placeholder="Inspector Name">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 15px; margin-bottom:0;">
+                            <label class="form-label">Name of Company/Agency:</label>
+                            <input type="text" class="form-control" id="companyAgency" placeholder="Company Name">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Electronic Signature:</label>
+                        <canvas id="signature-pad" width="600" height="150"></canvas>
+                        <div class="signature-controls">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="clearSignature()"><i class="fa-solid fa-eraser"></i> Clear</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Remarks / Notes</label>
+                        <textarea id="notes" class="form-control" rows="3" placeholder="Additional details..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-dark" onclick="closeModal('entryModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveBtn"><i class="fa-solid fa-save"></i> Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="viewModal">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">
+                <h3>Vehicle Details</h3>
+                <button class="btn btn-icon btn-danger" onclick="closeModal('viewModal')"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="viewContent">
+                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-dark" onclick="closeModal('viewModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastArea"></div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const API_URL = "https://api.apispreadsheets.com/data/mwGg3DM2MlgfdKoh/";
+        const API_AUTH = {
+            // Note: In a real production app, handle auth via backend proxy to hide keys
+            accessKey: "17405077772f25d3708143ce3492f0f0",
+            secretKey: "435c02e639dd3390fb14fbd7783b64cc"
+        };
+
+        // --- DATA STRUCTURES ---
+        const deviceList = [
+            { id: 'dashcam', label: 'Dash Cam', icon: 'fa-video' },
+            { id: 'mosquito', label: 'Mosquito Dev', icon: 'fa-volume-high' },
+            { id: 'napping', label: 'Anti Napping', icon: 'fa-eye' },
+            { id: 'thermal', label: 'Thermal Gun', icon: 'fa-temperature-high' },
+            { id: 'odometer', label: 'Odometer', icon: 'fa-gauge' },
+            { id: 'oilkit', label: 'Oil Spill Kit', icon: 'fa-oil-can' }
+        ];
+
+        let db = [];          // Master Database
+        let filteredDb = [];  // Display Database
+        let currentFilter = 'All';
+        
+        // Pagination State
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        
+        // Mobile State
+        let isMobile = window.innerWidth <= 992; 
+        
+        // Signature Pad Variables
+        let canvas, ctx;
+        let isDrawing = false;
+
+        // --- INITIALIZATION ---
+        $(document).ready(function() {
+            // Initial sidebar state based on screen size
+            if(isMobile) {
+                $('#sidebar').addClass('collapsed');
+                $('#main-content').removeClass('full-width');
+                // Sidebar starts collapsed on mobile, so floating button is visible
+                $('#floating-toggle').css('display', 'flex');
+            } else {
+                $('#sidebar').removeClass('collapsed');
+                $('#main-content').removeClass('full-width');
+                // Sidebar starts open on desktop, so floating button is hidden
+                $('#floating-toggle').css('display', 'none');
+            }
+            
+            // Initialize Icons based on state
+            updateToggleIcons();
+
+            // Window resize handler for mobile state
+            $(window).resize(function() {
+                const newIsMobile = window.innerWidth <= 992;
+                if (newIsMobile !== isMobile) {
+                    isMobile = newIsMobile;
+                    // Reset visibility based on the new state
+                    if (isMobile) {
+                        $('#sidebar').addClass('collapsed');
+                        $('#main-content').removeClass('full-width');
+                        $('#floating-toggle').css('display', 'flex');
+                    } else {
+                        $('#sidebar').removeClass('collapsed');
+                        $('#main-content').removeClass('full-width');
+                        $('#floating-toggle').css('display', 'none');
+                    }
+                    updateToggleIcons();
+                }
+                resizeCanvas(); // Resize canvas on window resize
+            });
+
+
+            generateDeviceInputs();
+            initSignaturePad(); // Initialize Signature Pad
+            syncData(); // Initial Load
+
+            // --- DELEGATED EVENT HANDLERS for dynamic buttons (THE FIX) ---
+            $('#tableBody').on('click', '.btn-view', function() {
+                viewItem($(this).data('id'));
+            });
+            $('#tableBody').on('click', '.btn-edit', function() {
+                editItem($(this).data('id'));
+            });
+            $('#tableBody').on('click', '.btn-delete', function() {
+                deleteItem($(this).data('id'));
+            });
+        });
+
+        function toggleSidebar() {
+            const sidebar = $('#sidebar');
+            const main = $('#main-content');
+            const floatingToggle = $('#floating-toggle');
+
+            // 1. Toggle the collapsed class
+            sidebar.toggleClass('collapsed');
+            
+            // 2. Adjust main content margin on Desktop
+            if(window.innerWidth > 992) {
+                 main.toggleClass('full-width');
+            }
+
+            // 3. Update floating toggle visibility based on the new state (consistent for all devices)
+            if (sidebar.hasClass('collapsed')) {
+                 floatingToggle.css('display', 'flex'); // Sidebar is hidden, show floating button
+            } else {
+                 floatingToggle.css('display', 'none'); // Sidebar is visible, hide floating button
+            }
+            
+            // 4. Update Icons (Hamburger <-> Chevron)
+            updateToggleIcons();
+        }
+        
+        function updateToggleIcons() {
+            const sidebar = $('#sidebar');
+            const icons = $('.toggle-btn i, #floating-toggle i');
+            
+            if(sidebar.hasClass('collapsed')) {
+                // Sidebar is hidden, show "Menu/Bars" icon to open it
+                icons.removeClass('fa-chevron-left').addClass('fa-bars');
+            } else {
+                // Sidebar is open, show "Chevron/Back" icon to close it
+                icons.removeClass('fa-bars').addClass('fa-chevron-left');
+            }
+        }
+
+        // --- CORE API FUNCTIONS (No changes needed) ---
+
+        function syncData() {
+            $('#loader').fadeIn(200);
+            
+            $.ajax({
+                url: API_URL,
+                type: "GET",
+                headers: API_AUTH,
+                success: function(res){
+                    processData(res.data);
+                    $('#loader').fadeOut(200);
+                    showToast('Sync Successful', 'Data updated from cloud.', 'success');
+                },
+                error: function(err){
+                    $('#loader').fadeOut(200);
+                    showToast('Sync Failed', 'Check internet connection.', 'error');
+                    console.error(err);
+                }
+            });
+        }
+
+        function processData(rawData) {
+            const map = {};
+
+            rawData.forEach(row => {
+                map[row.id] = row;
+            });
+
+            const cleanList = Object.values(map)
+                .filter(item => item.status !== 'DELETED_RECORD')
+                .map(row => normalizeRow(row));
+
+            cleanList.sort((a, b) => a.plate.localeCompare(b.plate));
+
+            db = cleanList;
+            applyFilters();
+            updateDashboard();
+        }
+
+        function pushToCloud(dataObj) {
+            const btn = $('#saveBtn');
+            const originalText = btn.html();
+            btn.html('<i class="fa-solid fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
+
+            const flatData = flattenRow(dataObj);
+
+            $.ajax({
+                url: API_URL,
+                type: "POST",
+                data: flatData,
+                headers: API_AUTH,
+                success: function(){
+                    updateLocalDb(dataObj);
+                    closeModal('entryModal');
+                    showToast('Saved', 'Record updated successfully.', 'success');
+                    btn.html(originalText).prop('disabled', false);
+                },
+                error: function(){
+                    showToast('Error', 'Failed to save to cloud.', 'error');
+                    btn.html(originalText).prop('disabled', false);
+                }
+            });
+        }
+
+        // --- DATA MAPPING HELPER (UPDATED to include new fields) ---
+        function normalizeRow(row) {
+            return {
+                id: row.id,
+                plate: row.plate,
+                odo: row.odo,
+                status: row.status,
+                notes: row.notes,
+                inspectionBy: row.inspection_by || '', 
+                companyAgency: row.company_agency || '', 
+                signatureData: row.signature_data || '', 
+                dateInspected: row.date_inspected || '', // New Field
+                updated: row.date_update || new Date().toLocaleDateString(),
+                devices: {
+                    dashcam: row.d_dashcam || 'Working',
+                    mosquito: row.d_mosquito || 'Working',
+                    napping: row.d_napping || 'Working',
+                    thermal: row.d_thermal || 'Working',
+                    odometer: row.d_odometer || 'Working',
+                    oilkit: row.d_oilkit || 'Working'
+                }
+            };
+        }
+
+        function flattenRow(obj) {
+            return {
+                id: obj.id,
+                plate: obj.plate,
+                odo: obj.odo,
+                status: obj.status,
+                notes: obj.notes,
+                date_update: new Date().toLocaleString(),
+                inspection_by: obj.inspectionBy, 
+                company_agency: obj.companyAgency, 
+                signature_data: obj.signatureData, 
+                date_inspected: obj.dateInspected, // New Field
+                d_dashcam: obj.devices.dashcam,
+                d_mosquito: obj.devices.mosquito,
+                d_napping: obj.devices.napping,
+                d_thermal: obj.devices.thermal,
+                d_odometer: obj.devices.odometer,
+                d_oilkit: obj.devices.oilkit
+            };
+        }
+
+        function updateLocalDb(item) {
+            if (item.status === 'DELETED_RECORD') {
+                db = db.filter(x => x.id !== item.id);
+            } else {
+                const idx = db.findIndex(x => x.id === item.id);
+                if (idx > -1) db[idx] = item;
+                else db.push(item);
+            }
+            applyFilters();
+            updateDashboard();
+        }
+
+        // --- UI RENDERING ---
+
+        function applyFilters() {
+            const search = $('#searchInput').val().toLowerCase();
+            
+            let temp = currentFilter === 'All' ? db : db.filter(x => x.status === currentFilter);
+            
+            if (search) {
+                temp = temp.filter(x => 
+                    x.plate.toLowerCase().includes(search) || 
+                    x.status.toLowerCase().includes(search)
+                );
+            }
+
+            filteredDb = temp;
+            currentPage = 1;
+            renderTable();
+        }
+
+        function filterTable(status) {
+            currentFilter = status;
+            $('.menu-item').removeClass('active');
+            // Find the menu item that corresponds to the status
+            $('.menu-item').filter(function() {
+                return $(this).attr('onclick').includes(`filterTable('${status}')`);
+            }).addClass('active');
+
+            $('#tableTitle').text(status === 'All' ? 'All Vehicles' : status + ' Vehicles');
+            applyFilters();
+
+            // Auto-collapse sidebar after selecting filter on small screens
+            if (window.innerWidth <= 992 && !$('#sidebar').hasClass('collapsed')) { 
+                toggleSidebar();
+            }
+        }
+
+        function handleSearch() {
+            applyFilters();
+        }
+
+        function renderTable() {
+            const tbody = $('#tableBody');
+            tbody.empty();
+
+            if (filteredDb.length === 0) {
+                tbody.html('<tr><td colspan="7" style="text-align:center; padding:30px; color:#999;">No records found matching your criteria.</td></tr>');
+                $('#paginationControls').html('');
+                return;
+            }
+
+            // Pagination Logic
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const pageData = filteredDb.slice(start, end);
+
+            pageData.forEach(v => {
+                let badgeClass = 'bg-standby';
+                if (v.status === 'Running') badgeClass = 'bg-running';
+                if (v.status === 'Break Down') badgeClass = 'bg-break';
+                if (v.status === 'For Repair') badgeClass = 'bg-repair';
+                if (v.status === 'Rescue') badgeClass = 'bg-rescue';
+                if (v.status === 'Bus Stop') badgeClass = 'bg-busstop'; 
+
+                // Calculate Device Issues
+                let issues = 0;
+                let critical = false;
+                Object.values(v.devices).forEach(s => {
+                    if (s !== 'Working' && s !== 'Checking') issues++;
+                    if (s === 'Damaged' || s === 'Missing') critical = true;
+                });
+
+                let icon = '<i class="fa-solid fa-circle-check" style="color:var(--success)"></i>';
+                if (v.status === 'Break Down' || critical) icon = '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>';
+                else if (issues > 0) icon = '<i class="fa-solid fa-circle-exclamation" style="color:var(--warning)"></i>';
+
+                const tr = `
+                <tr>
+                    <td style="text-align:center; font-size:1.1rem;">${icon}</td>
+                    <td><strong>${v.plate}</strong></td>
+                    <td><span class="badge ${badgeClass}">${v.status}</span></td>
+                    <td>${Number(v.odo).toLocaleString()} km</td>
+                    <td>${issues > 0 ? `<span style="color:var(--danger); font-weight:bold;">${issues} Issues</span>` : '<span style="color:#aaa;">OK</span>'}</td>
+                    <td style="font-size:0.8rem; color:#777;">${v.updated}</td>
+                    <td style="text-align:right;">
+                        <button class="btn btn-sm btn-dark btn-icon btn-view" title="View" data-id="${v.id}"><i class="fa-solid fa-eye"></i></button>
+                        <button class="btn btn-sm btn-primary btn-icon btn-edit" title="Edit" data-id="${v.id}"><i class="fa-solid fa-pen"></i></button>
+                        <button class="btn btn-sm btn-danger btn-icon btn-delete" title="Delete" data-id="${v.id}"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`;
+                tbody.append(tr);
+            });
+
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredDb.length / itemsPerPage);
+            const container = $('#paginationControls');
+            container.empty();
+
+            if (totalPages <= 1) return;
+
+            // Prev
+            container.append(`<div class="page-btn ${currentPage===1?'disabled':''}" onclick="changePage(${currentPage-1})"><i class="fa-solid fa-chevron-left"></i></div>`);
+            
+            // Numbers (Simplified)
+            for(let i=1; i<=totalPages; i++) {
+                if(i===1 || i===totalPages || (i >= currentPage-1 && i <= currentPage+1)) {
+                     container.append(`<div class="page-btn ${i===currentPage?'active':''}" onclick="changePage(${i})">${i}</div>`);
+                } else if (i === currentPage-2 || i === currentPage+2) {
+                    container.append(`<span>...</span>`);
+                }
+            }
+
+            // Next
+            container.append(`<div class="page-btn ${currentPage===totalPages?'disabled':''}" onclick="changePage(${currentPage+1})"><i class="fa-solid fa-chevron-right"></i></div>`);
+        }
+
+        function changePage(p) {
+            const total = Math.ceil(filteredDb.length / itemsPerPage);
+            if (p < 1 || p > total) return;
+            currentPage = p;
+            renderTable();
+        }
+
+        function updateDashboard() {
+            let sRun=0, sBreak=0, sRepair=0;
+            let dStats = {};
+            deviceList.forEach(d => dStats[d.id] = 0);
+
+            db.forEach(v => {
+                if(v.status === 'Running') sRun++;
+                if(v.status === 'Break Down') sBreak++;
+                if(v.status === 'For Repair') sRepair++;
+
+                Object.keys(v.devices).forEach(k => {
+                    const status = v.devices[k];
+                    if(status === 'Damaged' || status === 'Missing') dStats[k]++;
+                });
+            });
+
+            // Animate Numbers
+            animateValue("st-total", parseInt($('#st-total').text()), db.length, 500);
+            animateValue("st-run", parseInt($('#st-run').text()), sRun, 500);
+            animateValue("st-break", parseInt($('#st-break').text()), sBreak, 500);
+            animateValue("st-repair", parseInt($('#st-repair').text()), sRepair, 500);
+
+            // Render Device Matrix
+            let matrixHtml = '';
+            deviceList.forEach(d => {
+                if(dStats[d.id] > 0) {
+                    matrixHtml += `
+                    <div class="matrix-card" style="border-bottom:3px solid var(--danger);">
+                        <i class="fa-solid ${d.icon}" style="color:var(--secondary)"></i>
+                        <div class="matrix-val text-red">${dStats[d.id]}</div>
+                        <div style="font-size:0.7rem;">${d.label} Issue</div>
+                    </div>`;
+                }
+            });
+            if(matrixHtml === '') matrixHtml = '<p style="color:#aaa; font-style:italic; padding: 10px 0;">No active device alerts.</p>';
+            $('#deviceMatrix').html(matrixHtml);
+        }
+
+        // --- FORM & ACTIONS ---
+
+        function generateDeviceInputs() {
+            const container = $('#deviceInputs');
+            let html = '';
+            deviceList.forEach(d => {
+                html += `
+                <div class="dev-item">
+                    <label><i class="fa-solid ${d.icon}"></i> ${d.label}</label>
+                    <select id="d_${d.id}">
+                        <option value="Working">Working</option>
+                        <option value="Damaged" style="color:red">Damaged</option>
+                        <option value="Missing" style="color:red">Missing</option>
+                        <option value="Repair" style="color:orange">For Repair</option>
+                        <option value="Replacement" style="color:orange">For Replacement</option>
+                    </select>
+                </div>`;
+            });
+            container.html(html);
+        }
+
+        $('#vehicleForm').on('submit', function(e) {
+            e.preventDefault();
+            const id = $('#editId').val() || Date.now().toString();
+            
+            const devices = {};
+            deviceList.forEach(d => devices[d.id] = $(`#d_${d.id}`).val());
+
+            // Capture signature data
+            let signatureData = '';
+            if (!isCanvasBlank(canvas)) {
+                signatureData = canvas.toDataURL();
+            }
+
+            const data = {
+                id: id,
+                plate: $('#plate').val().toUpperCase(),
+                odo: $('#odo').val(),
+                status: $('#status').val(),
+                notes: $('#notes').val(),
+                inspectionBy: $('#inspectionBy').val(), 
+                companyAgency: $('#companyAgency').val(), 
+                signatureData: signatureData, 
+                dateInspected: $('#dateInspected').val(), // Save Date
+                devices: devices
+            };
+
+            pushToCloud(data);
+        });
+
+        function editItem(id) {
+            const v = db.find(x => x.id === id);
+            if(!v) return;
+
+            $('#editId').val(v.id);
+            $('#plate').val(v.plate);
+            $('#odo').val(v.odo);
+            $('#status').val(v.status);
+            $('#notes').val(v.notes);
+            $('#inspectionBy').val(v.inspectionBy); 
+            $('#companyAgency').val(v.companyAgency); 
+            $('#dateInspected').val(v.dateInspected); // Populate Date
+            
+            // Handle Signature Data
+            clearSignature(false); // Clear before loading new one
+            if (v.signatureData) {
+                loadSignature(v.signatureData);
+            }
+
+            Object.keys(v.devices).forEach(k => {
+                $(`#d_${k}`).val(v.devices[k]);
+            });
+
+            $('#modalTitle').text('Edit Vehicle');
+            $('#entryModal').addClass('active').css('display', 'flex').hide().fadeIn(200);
+        }
+
+        function deleteItem(id) {
+            if(confirm('Are you sure you want to delete this record? This cannot be undone.')) {
+                const v = db.find(x => x.id === id);
+                if(v) {
+                    v.status = 'DELETED_RECORD'; 
+                    pushToCloud(v);
+                }
+            }
+        }
+
+        function viewItem(id) {
+            const v = db.find(x => x.id === id);
+            if(!v) return;
+
+            let devHtml = '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">';
+            deviceList.forEach(d => {
+                const status = v.devices[d.id];
+                let color = 'var(--success)';
+                if(status === 'Damaged' || status === 'Missing') color = 'var(--danger)';
+                else if(status !== 'Working') color = 'var(--warning)';
+                
+                devHtml += `<div style="border:1px solid #eee; padding:8px; border-radius:4px;">
+                    <i class="fa-solid ${d.icon}" style="color:#777; width:20px;"></i> ${d.label} 
+                    <br><strong style="color:${color}; font-size:0.9rem;">${status}</strong>
+                </div>`;
+            });
+            devHtml += '</div>';
+
+            // Inspection Details
+            const inspectionHtml = `
+                <div style="margin-top:15px; padding:15px; border-top:1px dashed #ddd; border-bottom:1px dashed #ddd;">
+                    <h5 style="color:var(--primary); margin-top:0;">Inspection Details</h5>
+                    <p><strong>Date Inspected:</strong> ${v.dateInspected || 'N/A'}</p>
+                    <p><strong>Inspection By:</strong> ${v.inspectionBy || 'N/A'}</p>
+                    <p><strong>Company/Agency:</strong> ${v.companyAgency || 'N/A'}</p>
+                    <p><strong>Signature:</strong></p>
+                    ${v.signatureData ? `<img src="${v.signatureData}" style="max-width:100%; height:auto; border:1px solid #ddd; margin-top:5px; background:#fff;"/>` : '<p style="color:#aaa; font-style:italic;">No signature recorded.</p>'}
+                </div>
+            `;
+
+
+            const html = `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px;">
+                    <h2 style="color:var(--primary); margin:0;">${v.plate}</h2>
+                    <span class="badge bg-standby" style="background:var(--accent); color:#fff;">${v.status}</span>
+                </div>
+                <div style="margin:15px 0;">
+                    <p><strong><i class="fa-solid fa-gauge"></i> Odometer:</strong> ${Number(v.odo).toLocaleString()} km</p>
+                    <p><strong><i class="fa-solid fa-clock"></i> Updated:</strong> ${v.updated}</p>
+                </div>
+                <h5 style="color:#777; margin-bottom:5px;">Device Conditions</h5>
+                ${devHtml}
+                ${inspectionHtml}
+                <div style="background:#f8f9fa; padding:15px; border-radius:6px; margin-top:15px;">
+                    <h5 style="margin-top:0;">Remarks</h5>
+                    <p style="font-size:0.9rem; color:#555;">${v.notes || 'No remarks provided.'}</p>
+                </div>
+            `;
+            $('#viewContent').html(html);
+            $('#viewModal').addClass('active').css('display', 'flex').hide().fadeIn(200);
+        }
+
+        // --- SIGNATURE PAD LOGIC ---
+
+        function initSignaturePad() {
+            canvas = document.getElementById('signature-pad');
+            ctx = canvas.getContext('2d');
+            
+            // Set drawing style
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Initial resize and clear
+            resizeCanvas();
+            clearSignature(false);
+
+            // Mouse Events
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('mousemove', draw);
+
+            // Touch Events
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startDrawing(e.touches[0]);
+            });
+            canvas.addEventListener('touchend', stopDrawing);
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                draw(e.touches[0]);
+            });
+        }
+
+        function resizeCanvas() {
+            const modalContent = $('#entryModal .modal-content');
+            if(modalContent.length === 0) return; // Not initialized yet
+
+            const containerWidth = modalContent.width() - 50; // Accounting for 25px padding on each side
+            const scale = canvas.width / containerWidth;
+
+            // Preserve current drawing before resizing the actual element
+            const dataURL = isCanvasBlank(canvas) ? null : canvas.toDataURL();
+
+            // Set the canvas element's size in CSS/HTML for display
+            canvas.style.width = containerWidth + 'px';
+            canvas.style.height = (containerWidth * 150 / 600) + 'px'; // Maintain 600x150 aspect ratio
+
+            // Restore drawing after resize if it existed
+            if (dataURL) {
+                loadSignature(dataURL, true);
+            } else {
+                 clearSignature(false); // Clear the surface after potential scaling
+            }
+        }
+        
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Scale mouse position to the drawing surface (600x150)
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+            return { x: x, y: y };
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            const pos = getMousePos(e);
+            ctx.beginPath();
+            ctx.moveTo(pos.x, pos.y);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const pos = getMousePos(e);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function clearSignature(showToastMessage = true) {
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                // Optionally draw a border/background to clearly define the space if not using CSS border
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                if(showToastMessage) showToast('Cleared', 'Signature pad is cleared.', 'info');
+            }
+        }
+
+        function loadSignature(dataURL, forceNoClear = false) {
+            if(!forceNoClear) clearSignature(false);
+            const img = new Image();
+            img.onload = function() {
+                // Draw the image onto the canvas, fitting the drawing surface (600x150)
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            };
+            img.src = dataURL;
+        }
+
+        function isCanvasBlank(canvas) {
+            const blank = document.createElement('canvas');
+            blank.width = canvas.width;
+            blank.height = canvas.height;
+            // Compare the data URL of the canvas with a blank canvas
+            return canvas.toDataURL() === blank.toDataURL();
+        }
+        
+        // --- IMPORT / EXPORT ---
+
+        function exportData() {
+            if(db.length === 0) { showToast('Info', 'No data to export', 'error'); return; }
+            
+            let csv = "ID,Plate,Status,Odometer,DateUpdated,DateInspected,Dashcam,Mosquito,AntiNapping,Thermal,OdoDevice,OilKit,Notes,InspectionBy,CompanyAgency,SignatureData\n";
+            
+            db.forEach(v => {
+                // Escape quotes and replace newlines for CSV compatibility
+                const notes = v.notes ? v.notes.replace(/"/g, '""').replace(/\n/g, ' ') : '';
+                const inspectionBy = v.inspectionBy ? v.inspectionBy.replace(/"/g, '""') : '';
+                const companyAgency = v.companyAgency ? v.companyAgency.replace(/"/g, '""') : '';
+                
+                csv += `"${v.id}","${v.plate}","${v.status}","${v.odo}","${v.updated}","${v.dateInspected}","${v.devices.dashcam}","${v.devices.mosquito}","${v.devices.napping}","${v.devices.thermal}","${v.devices.odometer}","${v.devices.oilkit}","${notes}","${inspectionBy}","${companyAgency}","${v.signatureData}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `VDM_Export_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('Export', 'CSV file downloaded.', 'success');
+        }
+
+        function triggerImport() {
+            $('#importFile').click();
+        }
+
+        function handleImport(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    if(Array.isArray(json)) {
+                        db = json; 
+                        processData(db); 
+                        showToast('Import', 'Data imported locally. Click Sync to save if needed.', 'success');
+                    } else {
+                        showToast('Error', 'Invalid JSON format', 'error');
+                    }
+                } catch(err) {
+                    showToast('Error', 'Failed to parse JSON', 'error');
+                }
+            };
+            reader.readAsText(file);
+            input.value = ''; 
+        }
+
+        // --- UTILS ---
+
+        function openModal() {
+            $('#vehicleForm')[0].reset();
+            $('#editId').val('');
+            $('#modalTitle').text('Add New Vehicle');
+            
+            // Set Default Date to Today
+            const today = new Date().toISOString().split('T')[0];
+            $('#dateInspected').val(today);
+            
+            clearSignature();
+            // Need to make sure canvas is correctly sized before displaying
+            resizeCanvas();
+            $('#entryModal').addClass('active').css('display', 'flex').hide().fadeIn(200);
+        }
+
+        function closeModal(id) {
+            $(`#${id}`).fadeOut(200, function(){ $(this).removeClass('active'); });
+        }
+
+        function showToast(title, msg, type) {
+            const id = 't-' + Date.now();
+            const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-circle-xmark' : 'fa-info-circle');
+            const cls = type === 'success' ? 'toast-success' : (type === 'error' ? 'toast-error' : '');
+            
+            const html = `
+            <div id="${id}" class="toast ${cls}">
+                <i class="fa-solid ${icon}" style="font-size:1.5rem"></i>
+                <div>
+                    <h4 style="margin:0; font-size:0.95rem;">${title}</h4>
+                    <p style="margin:2px 0 0; font-size:0.85rem; color:#666;">${msg}</p>
+                </div>
+            </div>`;
+            
+            $('#toastArea').append(html);
+            setTimeout(() => $(`#${id}`).addClass('show'), 10);
+            setTimeout(() => {
+                $(`#${id}`).removeClass('show');
+                setTimeout(() => $(`#${id}`).remove(), 400);
+            }, 3000);
+        }
+
+        function animateValue(id, start, end, duration) {
+            if (start === end) return;
+            const range = end - start;
+            let current = start;
+            const increment = end > start ? 1 : -1;
+            const stepTime = Math.abs(Math.floor(duration / range));
+            const obj = document.getElementById(id);
+            const timer = setInterval(function() {
+                current += increment;
+                obj.innerHTML = current;
+                if (current == end) { clearInterval(timer); }
+            }, Math.max(stepTime, 20)); 
+        }
+        
+        // Close modal on outside click
+        $(window).click(function(e) {
+            if ($(e.target).hasClass('modal')) {
+                closeModal($(e.target).attr('id'));
+            }
+        });
+    </script>
+
+</script>
+<script>
+function protectSourceCode() {
+document.addEventListener('contextmenu', function(e) {
+e.preventDefault();
+});
+
+document.addEventListener('keydown', function(e) {
+if (e.keyCode === 123 ||
+(e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
+(e.ctrlKey && e.keyCode === 85) ||
+(e.ctrlKey && e.shiftKey && e.keyCode === 67) ||
+(e.ctrlKey && e.keyCode === 83) ||
+(e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
+(e.ctrlKey && e.shiftKey && e.keyCode === 74)) {
+e.preventDefault();
+return false;
+}
+});
+
+document.addEventListener('selectstart', function(e) {
+e.preventDefault();
+});
+
+document.addEventListener('dragstart', function(e) {
+e.preventDefault();
+});
+a
+document.onselectstart = function() {
+return false;
+};
+
+document.oncontextmenu = function() {
+return false;
+};
+}
+
+window.addEventListener('load', protectSourceCode);
+window.addEventListener('blur', () => {
+// Re-apply protection when window regains focus, just in case
+});
+
+</script>
+</body>
+</html>
